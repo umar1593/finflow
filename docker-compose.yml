@@ -1,0 +1,49 @@
+
+services:
+
+  postgres:
+    image: postgres:15
+    container_name: finflow_postgres
+    environment:
+      POSTGRES_USER: finflow
+      POSTGRES_PASSWORD: finflow123
+      POSTGRES_DB: finflow_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./ingestion/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finflow -d finflow_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  adminer:
+    image: adminer:4
+    container_name: finflow_adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  generator:
+    build:
+      context: ./ingestion
+      dockerfile: Dockerfile
+    container_name: finflow_generator
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: finflow
+      DB_PASSWORD: finflow123
+      DB_NAME: finflow_db
+      TRANSACTIONS_PER_SECOND: 2
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
+volumes:
+  postgres_data:
