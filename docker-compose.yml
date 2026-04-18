@@ -117,11 +117,6 @@ services:
       context: ./spark
       dockerfile: Dockerfile
     container_name: finflow_spark
-    command: >
-      spark-submit
-      --master local[*]
-      --driver-memory 1g
-      /app/transform.py
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
