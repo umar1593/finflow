@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: daily_summary
+    description: "Агрегация транзакций по дням, категориям и валютам"
+    columns:
+      - name: transaction_date
+        tests:
+          - not_null
+      - name: tx_count
+        tests:
+          - not_null
+      - name: fraud_rate_pct
+        tests:
+          - not_null
+
+  - name: user_metrics
+    description: "Метрики по каждому пользователю с Z-score флагом"
+    columns:
+      - name: user_id
+        tests:
+          - unique
+          - not_null
+      - name: total_transactions
+        tests:
+          - not_null
+      - name: is_high_value_user
+        tests:
+          - not_null
