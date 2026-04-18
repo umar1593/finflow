@@ -1,0 +1,52 @@
+version: 2
+
+sources:
+  - name: finflow
+    database: finflow_db
+    schema: public
+    tables:
+      - name: transactions
+        description: "Сырые транзакции из генератора"
+        columns:
+          - name: transaction_id
+            description: "Уникальный ID транзакции"
+            tests:
+              - unique
+              - not_null
+          - name: amount
+            description: "Сумма транзакции"
+            tests:
+              - not_null
+          - name: status
+            tests:
+              - accepted_values:
+                  values: ['completed', 'failed', 'pending']
+
+      - name: users
+        description: "Пользователи системы"
+        columns:
+          - name: user_id
+            tests:
+              - unique
+              - not_null
+          - name: email
+            tests:
+              - unique
+              - not_null
+
+models:
+  - name: stg_transactions
+    description: "Очищенные транзакции с derived-колонками"
+    columns:
+      - name: transaction_id
+        tests:
+          - unique
+          - not_null
+      - name: amount
+        tests:
+          - not_null
+      - name: amount_bucket
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['micro', 'small', 'medium', 'large', 'whale']
