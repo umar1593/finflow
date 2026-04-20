@@ -1,0 +1,19 @@
+apiVersion: 1
+
+datasources:
+  - name: FinFlow PostgreSQL
+    type: postgres
+    url: postgres:5432
+    user: finflow
+    secureJsonData:
+      password: finflow123
+    jsonData:
+      database: finflow_db
+      sslmode: disable
+      maxOpenConns: 10
+      maxIdleConns: 10
+      connMaxLifetime: 14400
+      postgresVersion: 1500
+      timescaledb: false
+    isDefault: true
+    editable: true

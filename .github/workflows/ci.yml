@@ -1,0 +1,135 @@
+name: FinFlow CI
+
+on:
+  push:
+    branches: [ main, "week-*" ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  lint:
+    name: Lint Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install linter
+        run: pip install flake8
+
+      - name: Run flake8
+        run: |
+          flake8 ingestion/ spark/ dags/ \
+            --max-line-length=100 \
+            --exclude=__pycache__ \
+            --count --statistics
+
+  test-generator:
+    name: Test data generator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install faker psycopg2-binary
+
+      - name: Test generator imports and constants
+        run: |
+          python -c "
+          import sys
+          sys.path.insert(0, 'ingestion')
+          # Проверяем что файл парсится без ошибок
+          import ast
+          with open('ingestion/generator.py') as f:
+              ast.parse(f.read())
+          print('generator.py: OK')
+
+          with open('ingestion/producer.py') as f:
+              ast.parse(f.read())
+          print('producer.py: OK')
+
+          with open('ingestion/consumer.py') as f:
+              ast.parse(f.read())
+          print('consumer.py: OK')
+
+          with open('dags/finflow_dag.py') as f:
+              ast.parse(f.read())
+          print('finflow_dag.py: OK')
+          "
+
+  dbt-compile:
+    name: dbt compile
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: finflow
+          POSTGRES_PASSWORD: finflow123
+          POSTGRES_DB: finflow_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dbt
+        run: pip install dbt-postgres
+
+      - name: Create schema
+        run: |
+          PGPASSWORD=finflow123 psql -h localhost -U finflow -d finflow_db \
+            -f ingestion/schema.sql
+
+      - name: Create dbt profiles
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml << 'EOF'
+          dbt_project:
+            target: ci
+            outputs:
+              ci:
+                type: postgres
+                host: localhost
+                port: 5432
+                user: finflow
+                password: finflow123
+                dbname: finflow_db
+                schema: analytics
+                threads: 4
+          EOF
+
+      - name: dbt compile
+        run: |
+          cd dbt_project
+          dbt compile
+
+      - name: dbt run
+        run: |
+          cd dbt_project
+          dbt run
+
+      - name: dbt test
+        run: |
+          cd dbt_project
+          dbt test

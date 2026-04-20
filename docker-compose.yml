@@ -157,10 +157,28 @@ services:
       postgres:
         condition: service_healthy
     restart: on-failure
-    command: standalone
     profiles:
       - airflow
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: finflow_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
 
 volumes:
   postgres_data:
   airflow_logs:
+  grafana_data:
