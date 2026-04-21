@@ -21,15 +21,15 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 DB_CONFIG = {
-    "host":     os.getenv("DB_HOST",     "localhost"),
-    "port":     int(os.getenv("DB_PORT", "5432")),
-    "user":     os.getenv("DB_USER",     "finflow"),
+    "host": os.getenv("DB_HOST", "localhost"),
+    "port": int(os.getenv("DB_PORT", "5432")),
+    "user": os.getenv("DB_USER", "finflow"),
     "password": os.getenv("DB_PASSWORD", "finflow123"),
-    "dbname":   os.getenv("DB_NAME",     "finflow_db"),
+    "dbname": os.getenv("DB_NAME", "finflow_db"),
 }
-KAFKA_SERVERS  = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
-TOPIC          = "transactions"
-POLL_INTERVAL  = int(os.getenv("POLL_INTERVAL_SECONDS", "5"))
+KAFKA_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+TOPIC = "transactions"
+POLL_INTERVAL = int(os.getenv("POLL_INTERVAL_SECONDS", "5"))
 
 
 def connect_db(retries=10, delay=3):
@@ -62,7 +62,6 @@ def connect_kafka(retries=15, delay=5):
 
 
 def run(db_conn, producer):
-    last_sent_id = None
 
     # Получаем последний transaction_id при старте
     with db_conn.cursor() as cur:
@@ -114,7 +113,7 @@ def run(db_conn, producer):
 
 
 if __name__ == "__main__":
-    db_conn  = connect_db()
+    db_conn = connect_db()
     producer = connect_kafka()
     try:
         run(db_conn, producer)

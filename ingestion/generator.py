@@ -7,7 +7,6 @@ import os
 import time
 import random
 import logging
-from datetime import datetime
 
 import psycopg2
 from psycopg2.extras import execute_values
@@ -23,11 +22,11 @@ fake = Faker()
 
 # ── настройки из переменных окружения ──────────────────────────────────────
 DB_CONFIG = {
-    "host":     os.getenv("DB_HOST",     "localhost"),
-    "port":     int(os.getenv("DB_PORT", "5432")),
-    "user":     os.getenv("DB_USER",     "finflow"),
+    "host": os.getenv("DB_HOST", "localhost"),
+    "port": int(os.getenv("DB_PORT", "5432")),
+    "user": os.getenv("DB_USER", "finflow"),
     "password": os.getenv("DB_PASSWORD", "finflow123"),
-    "dbname":   os.getenv("DB_NAME",     "finflow_db"),
+    "dbname": os.getenv("DB_NAME", "finflow_db"),
 }
 TPS = float(os.getenv("TRANSACTIONS_PER_SECOND", "2"))
 
@@ -37,19 +36,19 @@ CATEGORIES = [
     "healthcare", "electronics", "clothing", "utilities",
 ]
 MERCHANTS = {
-    "groceries":     ["Whole Foods", "Lidl", "Auchan", "Carrefour"],
+    "groceries": ["Whole Foods", "Lidl", "Auchan", "Carrefour"],
     "entertainment": ["Netflix", "Spotify", "Steam", "Kinopoisk"],
-    "travel":        ["Booking.com", "Airbnb", "Aeroflot", "S7 Airlines"],
-    "dining":        ["McDonald's", "Burger King", "Local Cafe", "Sushi Bar"],
-    "healthcare":    ["Medsi", "DocPlus", "Pharmacy 36.6", "SM-Clinic"],
-    "electronics":   ["DNS", "Mvideo", "Apple Store", "Samsung Store"],
-    "clothing":      ["Zara", "H&M", "Wildberries", "Lamoda"],
-    "utilities":     ["Gazprom", "Mosenergo", "ER-Telecom", "Rostelecom"],
+    "travel": ["Booking.com", "Airbnb", "Aeroflot", "S7 Airlines"],
+    "dining": ["McDonald's", "Burger King", "Local Cafe", "Sushi Bar"],
+    "healthcare": ["Medsi", "DocPlus", "Pharmacy 36.6", "SM-Clinic"],
+    "electronics": ["DNS", "Mvideo", "Apple Store", "Samsung Store"],
+    "clothing": ["Zara", "H&M", "Wildberries", "Lamoda"],
+    "utilities": ["Gazprom", "Mosenergo", "ER-Telecom", "Rostelecom"],
 }
-CURRENCIES  = ["USD", "EUR", "RUB", "GBP"]
-COUNTRIES   = ["Russia", "Germany", "USA", "France", "UK", "Netherlands"]
-STATUSES    = ["completed", "completed", "completed", "completed", "failed", "pending"]
-FRAUD_RATE  = 0.03   # 3% транзакций — фрод
+CURRENCIES = ["USD", "EUR", "RUB", "GBP"]
+COUNTRIES = ["Russia", "Germany", "USA", "France", "UK", "Netherlands"]
+STATUSES = ["completed", "completed", "completed", "completed", "failed", "pending"]
+FRAUD_RATE = 0.03   # 3% транзакций — фрод
 
 
 def connect(retries: int = 10, delay: int = 3) -> psycopg2.extensions.connection:
