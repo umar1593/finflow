@@ -10,10 +10,6 @@ from datetime import datetime
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.types import (
-    StructType, StructField,
-    StringType, DoubleType, BooleanType, TimestampType
-)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,19 +17,19 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-DB_HOST     = os.getenv("DB_HOST",     "postgres")
-DB_PORT     = os.getenv("DB_PORT",     "5432")
-DB_USER     = os.getenv("DB_USER",     "finflow")
+DB_HOST = os.getenv("DB_HOST", "postgres")
+DB_PORT = os.getenv("DB_PORT", "5432")
+DB_USER = os.getenv("DB_USER", "finflow")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "finflow123")
-DB_NAME     = os.getenv("DB_NAME",     "finflow_db")
+DB_NAME = os.getenv("DB_NAME", "finflow_db")
 BRONZE_PATH = os.getenv("BRONZE_PATH", "/data/bronze")
 SILVER_PATH = os.getenv("SILVER_PATH", "/data/silver")
 
 JDBC_URL = f"jdbc:postgresql://{DB_HOST}:{DB_PORT}/{DB_NAME}"
 JDBC_PROPS = {
-    "user":     DB_USER,
+    "user": DB_USER,
     "password": DB_PASSWORD,
-    "driver":   "org.postgresql.Driver",
+    "driver": "org.postgresql.Driver",
 }
 
 
@@ -103,16 +99,16 @@ def transform_silver(spark: SparkSession) -> None:
     # 4. Derived-колонки
     df = (
         df
-        .withColumn("hour_of_day",   F.hour("created_at"))
-        .withColumn("day_of_week",   F.dayofweek("created_at"))
-        .withColumn("is_weekend",    F.dayofweek("created_at").isin([1, 7]))
+        .withColumn("hour_of_day", F.hour("created_at"))
+        .withColumn("day_of_week", F.dayofweek("created_at"))
+        .withColumn("is_weekend", F.dayofweek("created_at").isin([1, 7]))
         .withColumn("amount_bucket",
-            F.when(F.col("amount") < 10,   "micro")
-             .when(F.col("amount") < 50,   "small")
-             .when(F.col("amount") < 200,  "medium")
-             .when(F.col("amount") < 1000, "large")
-             .otherwise("whale")
-        )
+                    F.when(F.col("amount") < 10, "micro")
+                    .when(F.col("amount") < 50, "small")
+                    .when(F.col("amount") < 200, "medium")
+                    .when(F.col("amount") < 1000, "large")
+                    .otherwise("whale")
+                    )
         .withColumn("processed_at", F.current_timestamp())
     )
 
@@ -121,7 +117,7 @@ def transform_silver(spark: SparkSession) -> None:
         df
         .withColumn("category", F.lower(F.trim(F.col("category"))))
         .withColumn("currency", F.upper(F.trim(F.col("currency"))))
-        .withColumn("status",   F.lower(F.trim(F.col("status"))))
+        .withColumn("status", F.lower(F.trim(F.col("status"))))
     )
 
     # 6. Партиционируем по категории
@@ -136,9 +132,9 @@ def transform_silver(spark: SparkSession) -> None:
           F.count("*").alias("count"),
           F.round(F.avg("amount"), 2).alias("avg_amount"),
           F.sum(F.col("is_fraud").cast("int")).alias("fraud_count"),
-      ) \
-      .orderBy("category", "amount_bucket") \
-      .show(50, truncate=False)
+    ) \
+        .orderBy("category", "amount_bucket") \
+        .show(50, truncate=False)
 
 
 # ── MAIN ──────────────────────────────────────────────────────────────────

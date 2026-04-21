@@ -19,8 +19,8 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 KAFKA_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
-TOPIC         = "transactions"
-GROUP_ID      = "finflow-consumer-group"
+TOPIC = "transactions"
+GROUP_ID = "finflow-consumer-group"
 
 
 def connect_kafka(retries=15, delay=5):
@@ -56,8 +56,8 @@ def run(consumer):
             amount = float(tx.get("amount", 0))
             is_fraud = tx.get("is_fraud", False)
 
-            stats[cat]["count"]  += 1
-            stats[cat]["total"]  += amount
+            stats[cat]["count"] += 1
+            stats[cat]["total"] += amount
             if is_fraud:
                 stats[cat]["fraud"] += 1
                 fraud_total += 1
