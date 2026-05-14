@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: finflow123
       POSTGRES_DB: finflow_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./ingestion/schema.sql:/docker-entrypoint-initdb.d/schema.sql
@@ -134,7 +134,9 @@ services:
       - spark
 
   airflow:
-    image: apache/airflow:2.9.1
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
     container_name: finflow_airflow
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -143,14 +145,23 @@ services:
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
-      _AIRFLOW_DB_MIGRATE: 'true'
-      _AIRFLOW_WWW_USER_CREATE: 'true'
-      _AIRFLOW_WWW_USER_USERNAME: admin
-      _AIRFLOW_WWW_USER_PASSWORD: admin123
+    # db migrate + создание admin-пользователя + scheduler и webserver
+    # в одном контейнере — этого достаточно для локального стенда.
+    command:
+      - bash
+      - -c
+      - |
+        airflow db migrate
+        airflow users create --username admin --password admin123 \
+          --firstname Finflow --lastname Admin --role Admin \
+          --email admin@finflow.local || true
+        airflow scheduler &
+        exec airflow webserver
     ports:
       - "8083:8080"
     volumes:
       - ./dags:/opt/airflow/dags
+      - .:/opt/airflow/project
       - ./data:/data
       - airflow_logs:/opt/airflow/logs
     depends_on:
@@ -159,6 +170,25 @@ services:
     restart: on-failure
     profiles:
       - airflow
+
+  # Валидация качества данных через Great Expectations.
+  # Запуск по требованию:  docker compose --profile gx run --rm gx-validate
+  gx-validate:
+    build:
+      context: ./expectations
+      dockerfile: Dockerfile
+    container_name: finflow_gx
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: finflow
+      DB_PASSWORD: finflow123
+      DB_NAME: finflow_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - gx
 
   grafana:
     image: grafana/grafana:10.4.0
@@ -172,6 +202,8 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       postgres:
         condition: service_healthy

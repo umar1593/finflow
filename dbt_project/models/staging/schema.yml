@@ -39,14 +39,22 @@ models:
     description: "Очищенные транзакции с derived-колонками"
     columns:
       - name: transaction_id
+        description: "Уникальный ID транзакции"
         tests:
           - unique
           - not_null
       - name: amount
+        description: "Сумма транзакции, строго положительная"
         tests:
           - not_null
+          - not_negative
       - name: amount_bucket
+        description: "Корзина по размеру суммы"
         tests:
           - not_null
           - accepted_values:
               values: ['micro', 'small', 'medium', 'large', 'whale']
+      - name: is_weekend
+        description: "Признак выходного дня"
+        tests:
+          - not_null

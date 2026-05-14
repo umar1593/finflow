@@ -24,6 +24,7 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "finflow123")
 DB_NAME = os.getenv("DB_NAME", "finflow_db")
 BRONZE_PATH = os.getenv("BRONZE_PATH", "/data/bronze")
 SILVER_PATH = os.getenv("SILVER_PATH", "/data/silver")
+SPARK_JARS = os.getenv("SPARK_JARS", "/opt/spark/jars/postgresql.jar")
 
 JDBC_URL = f"jdbc:postgresql://{DB_HOST}:{DB_PORT}/{DB_NAME}"
 JDBC_PROPS = {
@@ -37,7 +38,7 @@ def create_spark() -> SparkSession:
     return (
         SparkSession.builder
         .appName("FinFlow Transformations")
-        .config("spark.jars", "/opt/spark/jars/postgresql.jar")
+        .config("spark.jars", SPARK_JARS)
         .config("spark.sql.shuffle.partitions", "4")
         .config("spark.sql.parquet.compression.codec", "snappy")
         .getOrCreate()

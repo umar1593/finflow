@@ -1,0 +1,314 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": { "type": "postgres", "uid": "finflow_pg" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "finflow_pg" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS \"Всего транзакций\" FROM transactions",
+          "refId": "A"
+        }
+      ],
+      "title": "Всего транзакций",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "finflow_pg" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "unit": "currencyUSD" },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "finflow_pg" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(SUM(amount)::numeric, 2) AS \"Оборот\" FROM transactions",
+          "refId": "A"
+        }
+      ],
+      "title": "Суммарный оборот",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "finflow_pg" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "percent",
+          "min": 0,
+          "max": 15,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "finflow_pg" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(SUM(CASE WHEN is_fraud THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100, 2) AS \"Fraud rate\" FROM transactions",
+          "refId": "A"
+        }
+      ],
+      "title": "Доля фрода, %",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "finflow_pg" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "finflow_pg" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS \"Активных пользователей\" FROM users",
+          "refId": "A"
+        }
+      ],
+      "title": "Пользователей",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "finflow_pg" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "id": 5,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "finflow_pg" },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('hour', created_at) AS time, COUNT(*) AS \"транзакций/час\" FROM transactions WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Поток транзакций по часам",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "finflow_pg" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" }
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "фрод/час" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "id": 6,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "finflow_pg" },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('hour', created_at) AS time, SUM(CASE WHEN is_fraud THEN 1 ELSE 0 END) AS \"фрод/час\" FROM transactions WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Подозрительные транзакции по часам",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "finflow_pg" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 12 },
+      "id": 7,
+      "options": {
+        "displayLabels": ["percent"],
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "values": ["value"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "finflow_pg" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT category AS metric, COUNT(*) AS value FROM transactions GROUP BY category ORDER BY value DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Транзакции по категориям",
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "finflow_pg" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Потрачено" },
+            "properties": [{ "id": "unit", "value": "currencyUSD" }]
+          }
+        ]
+      },
+      "gridPos": { "h": 9, "w": 16, "x": 8, "y": 12 },
+      "id": 8,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "finflow_pg" },
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT u.username AS \"Пользователь\", u.country AS \"Страна\", COUNT(t.transaction_id) AS \"Транзакций\", ROUND(SUM(t.amount)::numeric, 2) AS \"Потрачено\", SUM(CASE WHEN t.is_fraud THEN 1 ELSE 0 END) AS \"Подозрительных\" FROM transactions t JOIN users u ON u.user_id = t.user_id GROUP BY u.user_id, u.username, u.country ORDER BY \"Потрачено\" DESC LIMIT 10",
+          "refId": "A"
+        }
+      ],
+      "title": "Топ-10 пользователей по обороту",
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["finflow"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "FinFlow — Overview",
+  "uid": "finflow-overview",
+  "version": 1,
+  "weekStart": ""
+}

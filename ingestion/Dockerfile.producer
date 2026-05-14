@@ -7,5 +7,6 @@ RUN pip install --no-cache-dir -r requirements.producer.txt
 
 COPY producer.py .
 COPY consumer.py .
+COPY stats.py .
 
 CMD ["python", "-u", "producer.py"]

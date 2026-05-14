@@ -2,28 +2,75 @@ version: 2
 
 models:
   - name: daily_summary
-    description: "Агрегация транзакций по дням, категориям и валютам"
+    description: >
+      Инкрементальная витрина дневных агрегатов по категориям и валютам:
+      объём, средние, стандартное отклонение, доля фрода, число отказов.
     columns:
       - name: transaction_date
+        description: "Дата (усечённая до дня) транзакций"
         tests:
           - not_null
       - name: tx_count
+        description: "Количество транзакций за день в разрезе"
         tests:
           - not_null
+          - not_negative
+      - name: total_amount
+        description: "Суммарный оборот за день в разрезе"
+        tests:
+          - not_negative
       - name: fraud_rate_pct
+        description: "Доля фрода, % (0–100)"
         tests:
           - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
 
   - name: user_metrics
-    description: "Метрики по каждому пользователю с Z-score флагом"
+    description: >
+      Метрики по каждому пользователю с флагом аномально высокого
+      среднего чека (правило mean + 2·σ по всей выборке).
     columns:
       - name: user_id
+        description: "ID пользователя"
         tests:
           - unique
           - not_null
       - name: total_transactions
+        description: "Всего транзакций у пользователя"
         tests:
           - not_null
+          - not_negative
+      - name: total_spent
+        description: "Суммарные траты пользователя"
+        tests:
+          - not_negative
       - name: is_high_value_user
+        description: "Флаг: средний чек выше mean + 2·σ по всем пользователям"
+        tests:
+          - not_null
+
+  - name: transaction_anomalies
+    description: >
+      Статистический скоринг каждой транзакции относительно истории
+      пользователя: классическая Z-оценка и робастная (modified z-score
+      на медиане и MAD). Метка is_fraud в скоринге не участвует.
+    columns:
+      - name: transaction_id
+        description: "ID транзакции"
+        tests:
+          - unique
+          - not_null
+      - name: z_score
+        description: "Классическая Z-оценка суммы относительно среднего пользователя"
+        tests:
+          - not_null
+      - name: robust_z_score
+        description: "Робастная Z-оценка (на медиане и MAD), устойчива к выбросам"
+        tests:
+          - not_null
+      - name: is_anomaly
+        description: "Флаг аномалии: z_score > 3.0 ИЛИ robust_z_score > 3.5"
         tests:
           - not_null

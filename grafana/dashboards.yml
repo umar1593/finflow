@@ -1,0 +1,15 @@
+apiVersion: 1
+
+# Автоматическая загрузка дашбордов из примонтированной папки.
+# Grafana подхватывает все *.json из /var/lib/grafana/dashboards при старте.
+providers:
+  - name: FinFlow
+    orgId: 1
+    folder: FinFlow
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

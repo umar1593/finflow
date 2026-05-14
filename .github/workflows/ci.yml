@@ -24,13 +24,13 @@ jobs:
 
       - name: Run flake8
         run: |
-          flake8 ingestion/ spark/ dags/ \
+          flake8 ingestion/ spark/ dags/ expectations/ tests/ \
             --max-line-length=100 \
             --exclude=__pycache__ \
             --count --statistics
 
-  test-generator:
-    name: Test data generator
+  unit-tests:
+    name: Unit tests (pytest)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,34 +41,13 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install faker psycopg2-binary
+        run: pip install -r requirements-dev.txt
 
-      - name: Test generator imports and constants
-        run: |
-          python -c "
-          import sys
-          sys.path.insert(0, 'ingestion')
-          # Проверяем что файл парсится без ошибок
-          import ast
-          with open('ingestion/generator.py') as f:
-              ast.parse(f.read())
-          print('generator.py: OK')
+      - name: Run pytest
+        run: pytest tests/ -v
 
-          with open('ingestion/producer.py') as f:
-              ast.parse(f.read())
-          print('producer.py: OK')
-
-          with open('ingestion/consumer.py') as f:
-              ast.parse(f.read())
-          print('consumer.py: OK')
-
-          with open('dags/finflow_dag.py') as f:
-              ast.parse(f.read())
-          print('finflow_dag.py: OK')
-          "
-
-  dbt-compile:
-    name: dbt compile
+  dbt:
+    name: dbt build & test
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -85,6 +64,13 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+    env:
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_USER: finflow
+      DB_PASSWORD: finflow123
+      DB_NAME: finflow_db
+
     steps:
       - uses: actions/checkout@v4
 
@@ -94,42 +80,71 @@ jobs:
           python-version: "3.11"
 
       - name: Install dbt
-        run: pip install dbt-postgres
+        run: pip install "dbt-core==1.8.8" "dbt-postgres==1.8.8"
 
       - name: Create schema
         run: |
           PGPASSWORD=finflow123 psql -h localhost -U finflow -d finflow_db \
             -f ingestion/schema.sql
 
-      - name: Create dbt profiles
+      - name: Seed sample data
         run: |
-          mkdir -p ~/.dbt
-          cat > ~/.dbt/profiles.yml << 'EOF'
-          dbt_project:
-            target: ci
-            outputs:
-              ci:
-                type: postgres
-                host: localhost
-                port: 5432
-                user: finflow
-                password: finflow123
-                dbname: finflow_db
-                schema: analytics
-                threads: 4
-          EOF
+          PGPASSWORD=finflow123 psql -h localhost -U finflow -d finflow_db \
+            -f ingestion/seed_sample.sql
 
-      - name: dbt compile
-        run: |
-          cd dbt_project
-          dbt compile
+      - name: dbt deps
+        working-directory: dbt_project
+        run: dbt deps
 
-      - name: dbt run
-        run: |
-          cd dbt_project
-          dbt run
+      - name: dbt build (run + test)
+        working-directory: dbt_project
+        run: dbt build --profiles-dir .
 
-      - name: dbt test
+  great-expectations:
+    name: Data quality (Great Expectations)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: finflow
+          POSTGRES_PASSWORD: finflow123
+          POSTGRES_DB: finflow_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_USER: finflow
+      DB_PASSWORD: finflow123
+      DB_NAME: finflow_db
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Great Expectations
+        run: pip install -r expectations/requirements.txt
+
+      - name: Create schema
         run: |
-          cd dbt_project
-          dbt test
+          PGPASSWORD=finflow123 psql -h localhost -U finflow -d finflow_db \
+            -f ingestion/schema.sql
+
+      - name: Seed sample data
+        run: |
+          PGPASSWORD=finflow123 psql -h localhost -U finflow -d finflow_db \
+            -f ingestion/seed_sample.sql
+
+      - name: Run expectation suites
+        run: python expectations/validate.py

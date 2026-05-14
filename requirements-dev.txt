@@ -1,0 +1,5 @@
+# Зависимости для локальной разработки и CI (unit-тесты, линтер).
+pytest
+flake8
+faker
+psycopg2-binary

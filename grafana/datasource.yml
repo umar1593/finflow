@@ -2,6 +2,7 @@ apiVersion: 1
 
 datasources:
   - name: FinFlow PostgreSQL
+    uid: finflow_pg
     type: postgres
     url: postgres:5432
     user: finflow
