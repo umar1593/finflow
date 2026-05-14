@@ -49,6 +49,7 @@ dag = DAG(
     tags=["finflow", "etl", "daily"],
 )
 
+
 def get_connection():
     import psycopg2
     return psycopg2.connect(**DB_CONN)
