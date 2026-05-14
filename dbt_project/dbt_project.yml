@@ -1,7 +1,6 @@
 name: 'finflow'
 version: '1.0.0'
 
-# Профиль подключения берётся из dbt_project/profiles.yml
 profile: 'finflow'
 
 model-paths: ["models"]
@@ -15,9 +14,6 @@ clean-targets:
   - "target"
   - "dbt_packages"
 
-# Материализация по слоям Medallion:
-#  - staging  → view  (лёгкий слой очистки, пересчитывается на лету)
-#  - marts    → table (Gold-витрины, читаются аналитикой и Grafana)
 models:
   finflow:
     staging:

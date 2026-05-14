@@ -1,8 +1,4 @@
-"""
-FinFlow — PySpark трансформации
-Bronze: сырые данные из Postgres → Parquet
-Silver: очищенные и обогащённые данные → Parquet
-"""
+"""Выгружает Bronze и собирает Silver-слой."""
 
 import os
 import logging
@@ -45,9 +41,8 @@ def create_spark() -> SparkSession:
     )
 
 
-# ── BRONZE ────────────────────────────────────────────────────────────────
 def extract_bronze(spark: SparkSession) -> None:
-    """Читаем сырые данные из Postgres и пишем в Parquet как есть."""
+    """Читает данные из Postgres и пишет Bronze."""
     log.info("Извлекаем transactions → Bronze")
 
     df_transactions = spark.read.jdbc(
@@ -74,9 +69,8 @@ def extract_bronze(spark: SparkSession) -> None:
              df_transactions.count(), df_users.count())
 
 
-# ── SILVER ────────────────────────────────────────────────────────────────
 def transform_silver(spark: SparkSession) -> None:
-    """Очищаем, джойним, добавляем derived-колонки → Silver."""
+    """Собирает Silver-слой."""
     log.info("Трансформируем Bronze → Silver")
 
     run_date = datetime.now().strftime("%Y-%m-%d")
@@ -84,20 +78,16 @@ def transform_silver(spark: SparkSession) -> None:
     tx = spark.read.parquet(f"{BRONZE_PATH}/transactions/date={run_date}")
     users = spark.read.parquet(f"{BRONZE_PATH}/users/date={run_date}")
 
-    # 1. Убираем дубли
     tx = tx.dropDuplicates(["transaction_id"])
 
-    # 2. Фильтруем некорректные суммы
     tx = tx.filter(F.col("amount") > 0)
 
-    # 3. Джойним с пользователями
     df = tx.join(
         users.select("user_id", "username", "country", "age"),
         on="user_id",
         how="left",
     )
 
-    # 4. Derived-колонки
     df = (
         df
         .withColumn("hour_of_day", F.hour("created_at"))
@@ -113,7 +103,6 @@ def transform_silver(spark: SparkSession) -> None:
         .withColumn("processed_at", F.current_timestamp())
     )
 
-    # 5. Нормализуем строки
     df = (
         df
         .withColumn("category", F.lower(F.trim(F.col("category"))))
@@ -121,12 +110,10 @@ def transform_silver(spark: SparkSession) -> None:
         .withColumn("status", F.lower(F.trim(F.col("status"))))
     )
 
-    # 6. Партиционируем по категории
     df.write.mode("overwrite").partitionBy("category").parquet(SILVER_PATH)
 
     log.info("Silver: %d строк записано", df.count())
 
-    # Показываем схему и примеры
     df.printSchema()
     df.groupBy("category", "amount_bucket") \
       .agg(
@@ -138,7 +125,6 @@ def transform_silver(spark: SparkSession) -> None:
         .show(50, truncate=False)
 
 
-# ── MAIN ──────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     spark = create_spark()
     spark.sparkContext.setLogLevel("WARN")

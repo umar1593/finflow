@@ -22,13 +22,18 @@ CREATE TABLE IF NOT EXISTS transactions (
     created_at      TIMESTAMP   NOT NULL DEFAULT NOW()
 );
 
--- Индексы для быстрых запросов
+CREATE TABLE IF NOT EXISTS producer_offsets (
+    stream_key          TEXT PRIMARY KEY,
+    last_created_at     TIMESTAMP NOT NULL,
+    last_transaction_id UUID NOT NULL,
+    updated_at          TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id   ON transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at);
 CREATE INDEX IF NOT EXISTS idx_transactions_category   ON transactions(category);
 CREATE INDEX IF NOT EXISTS idx_transactions_is_fraud   ON transactions(is_fraud);
 
--- Вьюха для быстрой проверки данных
 CREATE OR REPLACE VIEW v_transaction_summary AS
 SELECT
     date_trunc('hour', created_at) AS hour,

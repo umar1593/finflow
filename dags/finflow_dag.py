@@ -1,21 +1,4 @@
-"""
-FinFlow — главный DAG.
-
-Оркестрирует весь ежедневный пайплайн:
-
-    start
-      → check_data_availability   проверяем, что за сутки есть свежие данные
-      → gx_validate_source        Great Expectations: валидация сырых данных
-      → spark_bronze_silver       PySpark: Bronze + Silver слои
-      → dbt_run                   dbt: Gold-витрины
-      → dbt_test                  dbt: тесты моделей
-      → data_quality_check        контрольные проверки итоговых данных
-      → end
-
-Запускается каждый день в 06:00. Тяжёлые инструменты (Spark, dbt, GE)
-живут в кастомном образе Airflow (см. airflow/Dockerfile) — dbt и GE в
-изолированных venv, поэтому DAG вызывает их по абсолютному пути.
-"""
+"""DAG для ежедневного запуска FinFlow."""
 
 from datetime import datetime, timedelta
 
@@ -25,7 +8,6 @@ from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.utils.trigger_rule import TriggerRule
 
-# ── константы ──────────────────────────────────────────────────────────────
 DB_CONN = {
     "host": "postgres",
     "port": 5432,
@@ -34,15 +16,14 @@ DB_CONN = {
     "dbname": "finflow_db",
 }
 
-FRAUD_RATE_THRESHOLD = 10.0   # максимально допустимый % фрода
-DATA_LOOKBACK_HOURS = 25      # окно проверки наличия данных
+FRAUD_RATE_THRESHOLD = 10.0
+DATA_LOOKBACK_HOURS = 25
 
 PROJECT_DIR = "/opt/airflow/project"
 DBT_DIR = f"{PROJECT_DIR}/dbt_project"
 DBT_BIN = "/opt/dbt-venv/bin/dbt"
 GX_PYTHON = "/opt/gx-venv/bin/python"
 
-# окружение для подключения к Postgres из задач Spark / GE
 DB_ENV = {
     "DB_HOST": DB_CONN["host"],
     "DB_PORT": str(DB_CONN["port"]),
@@ -51,7 +32,6 @@ DB_ENV = {
     "DB_NAME": DB_CONN["dbname"],
 }
 
-# ── настройки DAG ──────────────────────────────────────────────────────────
 default_args = {
     "owner": "finflow",
     "retries": 2,
@@ -69,18 +49,13 @@ dag = DAG(
     tags=["finflow", "etl", "daily"],
 )
 
-# ── хелпер подключения ─────────────────────────────────────────────────────
-
-
 def get_connection():
     import psycopg2
     return psycopg2.connect(**DB_CONN)
 
 
-# ── Python-задачи ──────────────────────────────────────────────────────────
-
 def check_data_availability(**context):
-    """Проверяем, что за последние сутки в Postgres есть данные."""
+    """Проверяет, что за последние сутки есть данные."""
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -106,7 +81,7 @@ def check_data_availability(**context):
 
 
 def run_data_quality_check(**context):
-    """Контрольные проверки итоговых данных после dbt."""
+    """Базовые проверки после расчёта витрин."""
     conn = get_connection()
     errors = []
     try:
@@ -148,8 +123,6 @@ def run_data_quality_check(**context):
 
     print(f"Все проверки прошли. Fraud rate: {fraud_rate}%")
 
-
-# ── граф задач ─────────────────────────────────────────────────────────────
 
 start = EmptyOperator(task_id="start", dag=dag)
 
@@ -211,7 +184,6 @@ end = EmptyOperator(
     dag=dag,
 )
 
-# ── зависимости ────────────────────────────────────────────────────────────
 (
     start
     >> check_data

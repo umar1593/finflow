@@ -17,16 +17,13 @@ user_metrics as (
         min(created_at)                             as first_transaction_at,
         max(created_at)                             as last_transaction_at,
 
-        -- любимая категория пользователя
         mode() within group (order by category)    as top_category,
 
-        -- процент weekend транзакций
         round(
             sum(case when is_weekend then 1 else 0 end)::numeric
             / nullif(count(*), 0) * 100, 2
         )                                           as weekend_tx_pct,
 
-        -- Z-score флаг: пользователи с аномально высоким avg
         case
             when avg(amount) > (
                 select avg(amount) + 2 * stddev(amount)

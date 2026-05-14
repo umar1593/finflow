@@ -1,14 +1,4 @@
-"""
-FinFlow — статистический модуль обнаружения аномалий.
-
-Содержит онлайн-оценку среднего и дисперсии (алгоритм Уэлфорда),
-детекторы выбросов (Z-оценка и межквартильный размах Тьюки) и
-матрицу ошибок для оценки качества детектора.
-
-Модуль не зависит от Kafka и Postgres — он чистый и легко тестируется
-(см. tests/test_stats.py). Kafka consumer импортирует его и применяет
-к потоку транзакций.
-"""
+"""Вспомогательная статистика для consumer."""
 from __future__ import annotations
 
 import math
@@ -18,17 +8,11 @@ from typing import Iterable
 
 @dataclass
 class RunningStats:
-    """Онлайн-оценка среднего и выборочной дисперсии (алгоритм Уэлфорда, 1962).
-
-    Вычисляет mean и variance за один проход по потоку, используя O(1)
-    памяти. В отличие от наивной формулы через sum(x) и sum(x^2),
-    алгоритм Уэлфорда численно устойчив и не теряет точность на
-    больших объёмах данных.
-    """
+    """Онлайн-оценка среднего и выборочной дисперсии."""
 
     n: int = 0
     mean: float = 0.0
-    m2: float = 0.0  # накопленная сумма квадратов отклонений от среднего
+    m2: float = 0.0
 
     def update(self, x: float) -> None:
         self.n += 1
@@ -39,7 +23,6 @@ class RunningStats:
 
     @property
     def variance(self) -> float:
-        """Несмещённая выборочная дисперсия (делитель n-1)."""
         return self.m2 / (self.n - 1) if self.n > 1 else 0.0
 
     @property
@@ -55,7 +38,7 @@ class RunningStats:
 
 
 def quantile(sorted_values: list[float], q: float) -> float:
-    """Квантиль уровня q по линейной интерполяции (метод по умолчанию в numpy)."""
+    """Квантиль по линейной интерполяции."""
     n = len(sorted_values)
     if n == 0:
         raise ValueError("пустая выборка")
@@ -70,13 +53,7 @@ def quantile(sorted_values: list[float], q: float) -> float:
 
 
 def iqr_bounds(values: Iterable[float], k: float = 1.5) -> tuple[float, float]:
-    """Границы выбросов по межквартильному размаху (метод Тьюки).
-
-    Возвращает (lower, upper); значения вне этого интервала считаются
-    выбросами. k=1.5 — классический порог, k=3.0 — «экстремальные»
-    выбросы. Метод устойчив к самим выбросам, т.к. опирается на
-    квартили, а не на среднее.
-    """
+    """Границы выбросов по межквартильному размаху."""
     data = sorted(values)
     if len(data) < 4:
         return float("-inf"), float("inf")
@@ -88,16 +65,7 @@ def iqr_bounds(values: Iterable[float], k: float = 1.5) -> tuple[float, float]:
 
 @dataclass
 class AnomalyDetector:
-    """Потоковый детектор аномальных транзакций.
-
-    Транзакция помечается подозрительной, если её сумма даёт Z-оценку
-    выше порога — либо относительно истории конкретного пользователя,
-    либо относительно глобального распределения сумм.
-
-    Важно: метка is_fraud из генератора при принятии решения НЕ
-    используется. Детектор работает «вслепую», а is_fraud служит лишь
-    для последующей оценки качества (precision / recall / F1).
-    """
+    """Потоковый детектор аномальных сумм."""
 
     z_threshold: float = 3.0
     min_history: int = 5
@@ -115,8 +83,6 @@ class AnomalyDetector:
         )
         is_anomaly = z_user > self.z_threshold or z_global > self.z_threshold
 
-        # статистику обновляем ПОСЛЕ оценки, чтобы выброс не «размывал»
-        # собственную базовую линию ещё до того, как его заметили
         user.update(amount)
         self.global_stats.update(amount)
 
@@ -129,12 +95,12 @@ class AnomalyDetector:
 
 @dataclass
 class ConfusionMatrix:
-    """Матрица ошибок: сравнивает предсказание детектора с меткой is_fraud."""
+    """Счётчики для precision/recall/F1."""
 
-    tp: int = 0  # детектор сказал «аномалия» и это фрод
-    fp: int = 0  # детектор сказал «аномалия», но фрода не было
+    tp: int = 0
+    fp: int = 0
     tn: int = 0
-    fn: int = 0  # детектор пропустил реальный фрод
+    fn: int = 0
 
     def update(self, predicted: bool, actual: bool) -> None:
         if predicted and actual:

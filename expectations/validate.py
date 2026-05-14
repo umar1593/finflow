@@ -1,16 +1,4 @@
-"""
-FinFlow — валидация качества данных через Great Expectations.
-
-Скрипт подключается к Postgres, выгружает таблицы transactions и users
-и прогоняет по ним наборы ожиданий (expectation suites). Если хотя бы
-одно ожидание не выполнено — процесс завершается с кодом 1, что
-останавливает Airflow-задачу gx_validate_source.
-
-Запуск:
-    docker compose --profile gx run --rm gx-validate
-или внутри Airflow:
-    /opt/gx-venv/bin/python /opt/airflow/project/expectations/validate.py
-"""
+"""Проверки данных через Great Expectations."""
 
 import os
 import sys
@@ -34,7 +22,6 @@ DB_CONFIG = {
     "dbname": os.getenv("DB_NAME", "finflow_db"),
 }
 
-# бизнес-справочники — должны совпадать с генератором
 VALID_STATUSES = ["completed", "failed", "pending"]
 VALID_CATEGORIES = [
     "groceries", "entertainment", "travel", "dining",
@@ -52,7 +39,7 @@ def get_engine():
 
 
 def validate_transactions(context, df: pd.DataFrame):
-    """Набор ожиданий для таблицы transactions."""
+    """Проверки для transactions."""
     asset = context.sources.add_or_update_pandas(
         "finflow_transactions"
     ).add_dataframe_asset(name="transactions")
@@ -63,21 +50,17 @@ def validate_transactions(context, df: pd.DataFrame):
         expectation_suite_name="transactions_suite",
     )
 
-    # целостность ключей
     v.expect_column_values_to_not_be_null("transaction_id")
     v.expect_column_values_to_be_unique("transaction_id")
     v.expect_column_values_to_not_be_null("user_id")
 
-    # суммы: не null и строго положительные
     v.expect_column_values_to_not_be_null("amount")
     v.expect_column_values_to_be_between("amount", min_value=0, strict_min=True)
 
-    # категориальные поля — только из справочников
     v.expect_column_values_to_be_in_set("status", VALID_STATUSES)
     v.expect_column_values_to_be_in_set("category", VALID_CATEGORIES)
     v.expect_column_values_to_be_in_set("currency", VALID_CURRENCIES)
 
-    # доля фрода должна укладываться в разумный диапазон (генератор: ~3%)
     v.expect_column_values_to_be_in_set("is_fraud", [True, False])
     v.expect_column_mean_to_be_between("is_fraud", min_value=0.0, max_value=0.10)
 
@@ -85,7 +68,7 @@ def validate_transactions(context, df: pd.DataFrame):
 
 
 def validate_users(context, df: pd.DataFrame):
-    """Набор ожиданий для таблицы users."""
+    """Проверки для users."""
     asset = context.sources.add_or_update_pandas(
         "finflow_users"
     ).add_dataframe_asset(name="users")
@@ -116,7 +99,7 @@ def main() -> int:
         log.error("Одна из таблиц пуста — нечего валидировать")
         return 1
 
-    context = gx.get_context()  # ephemeral-контекст, без файлов на диске
+    context = gx.get_context()
     results = {
         "transactions": validate_transactions(context, tx),
         "users": validate_users(context, users),

@@ -6,20 +6,17 @@
     )
 }}
 
--- Витрина дневных агрегатов.
---
--- Модель инкрементальная: при повторном запуске пересчитываются только
--- последние сутки (а не вся история). unique_key обеспечивает merge —
--- строки за «открытый» день перезаписываются по мере поступления новых
--- транзакций, поэтому поздно пришедшие данные не теряются.
+-- Дневные агрегаты по категориям и валютам.
 
 with base as (
     select * from {{ ref('stg_transactions') }}
 
     {% if is_incremental() %}
-    -- берём только данные начиная с последней посчитанной даты
     where transaction_date >= (
-        select coalesce(max(transaction_date), '1900-01-01')
+        select coalesce(
+            max(transaction_date) - interval '7 day',
+            '1900-01-01'::timestamp
+        )
         from {{ this }}
     )
     {% endif %}
@@ -35,7 +32,6 @@ daily_summary as (
         round(avg(amount)::numeric, 2)              as avg_amount,
         round(min(amount)::numeric, 2)              as min_amount,
         round(max(amount)::numeric, 2)              as max_amount,
-        -- выборочное стандартное отклонение сумм за день
         round(stddev_samp(amount)::numeric, 2)      as stddev_amount,
         sum(case when is_fraud then 1 else 0 end)   as fraud_count,
         round(

@@ -1,13 +1,11 @@
-"""
-FinFlow — Kafka Producer
-Читает новые транзакции из Postgres и отправляет в топик transactions
-"""
+"""Читает транзакции из Postgres и отправляет их в Kafka."""
 
 import os
 import time
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
+from typing import Tuple
 
 import psycopg2
 import psycopg2.extras
@@ -30,6 +28,9 @@ DB_CONFIG = {
 KAFKA_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 TOPIC = "transactions"
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL_SECONDS", "5"))
+STATE_KEY = os.getenv("PRODUCER_STATE_KEY", "transactions")
+START_MODE = os.getenv("PRODUCER_START_MODE", "earliest")
+ZERO_UUID = "00000000-0000-0000-0000-000000000000"
 
 
 def connect_db(retries=10, delay=3):
@@ -61,15 +62,102 @@ def connect_kafka(retries=15, delay=5):
     raise RuntimeError("Не удалось подключиться к Kafka")
 
 
-def run(db_conn, producer):
-
-    # Получаем последний transaction_id при старте
+def ensure_state_table(db_conn) -> None:
     with db_conn.cursor() as cur:
-        cur.execute("SELECT MAX(created_at) FROM transactions")
-        row = cur.fetchone()
-        last_ts = row[0] if row[0] else datetime.min.replace(tzinfo=timezone.utc)
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS producer_offsets (
+                stream_key TEXT PRIMARY KEY,
+                last_created_at TIMESTAMP NOT NULL,
+                last_transaction_id UUID NOT NULL,
+                updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+    db_conn.commit()
 
-    log.info("Producer запущен, начинаем с %s, топик: %s", last_ts, TOPIC)
+
+def get_latest_cursor(db_conn) -> Tuple[datetime, str]:
+    with db_conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                COALESCE(MAX(created_at), %s::timestamp)
+            FROM transactions
+            """,
+            (datetime.min,),
+        )
+        row = cur.fetchone()
+        last_created_at = row[0]
+
+        cur.execute(
+            """
+            SELECT COALESCE(
+                MAX(transaction_id)::text,
+                %s
+            )
+            FROM transactions
+            WHERE created_at = %s
+            """,
+            (ZERO_UUID, last_created_at),
+        )
+        last_transaction_id = cur.fetchone()[0]
+
+    return last_created_at, last_transaction_id
+
+
+def load_cursor(db_conn) -> Tuple[datetime, str]:
+    with db_conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT last_created_at, last_transaction_id::text
+            FROM producer_offsets
+            WHERE stream_key = %s
+            """,
+            (STATE_KEY,),
+        )
+        row = cur.fetchone()
+
+    if row:
+        return row[0], row[1]
+
+    if START_MODE == "earliest":
+        return datetime.min, ZERO_UUID
+
+    return get_latest_cursor(db_conn)
+
+
+def save_cursor(db_conn, created_at: datetime, transaction_id: str) -> None:
+    with db_conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO producer_offsets (
+                stream_key,
+                last_created_at,
+                last_transaction_id,
+                updated_at
+            )
+            VALUES (%s, %s, %s::uuid, NOW())
+            ON CONFLICT (stream_key) DO UPDATE
+            SET last_created_at = EXCLUDED.last_created_at,
+                last_transaction_id = EXCLUDED.last_transaction_id,
+                updated_at = NOW()
+            """,
+            (STATE_KEY, created_at, transaction_id),
+        )
+    db_conn.commit()
+
+
+def run(db_conn, producer):
+    ensure_state_table(db_conn)
+    last_created_at, last_transaction_id = load_cursor(db_conn)
+
+    log.info(
+        "Producer запущен, курсор: %s / %s, топик: %s",
+        last_created_at,
+        last_transaction_id,
+        TOPIC,
+    )
     total_sent = 0
 
     while True:
@@ -87,23 +175,37 @@ def run(db_conn, producer):
                     t.merchant,
                     t.status,
                     t.is_fraud,
-                    t.created_at::text
+                    t.created_at
                 FROM transactions t
                 JOIN users u ON u.user_id = t.user_id
-                WHERE t.created_at > %s
-                ORDER BY t.created_at ASC
+                WHERE (
+                    t.created_at > %s
+                    OR (
+                        t.created_at = %s
+                        AND t.transaction_id > %s::uuid
+                    )
+                )
+                ORDER BY t.created_at ASC, t.transaction_id ASC
                 LIMIT 500
                 """,
-                (last_ts,),
+                (last_created_at, last_created_at, last_transaction_id),
             )
             rows = cur.fetchall()
 
         if rows:
             for row in rows:
-                producer.send(TOPIC, value=dict(row), key=row["transaction_id"].encode())
-                last_ts = row["created_at"]
+                producer.send(
+                    TOPIC,
+                    value=dict(row),
+                    key=row["transaction_id"].encode(),
+                )
+
+            last_row = rows[-1]
+            last_created_at = last_row["created_at"]
+            last_transaction_id = last_row["transaction_id"]
 
             producer.flush()
+            save_cursor(db_conn, last_created_at, last_transaction_id)
             total_sent += len(rows)
             log.info("Отправлено в Kafka: %d сообщений (всего %d)", len(rows), total_sent)
         else:

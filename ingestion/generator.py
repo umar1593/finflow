@@ -1,7 +1,4 @@
-"""
-FinFlow — генератор синтетических транзакций
-Создаёт пользователей и непрерывно пишет транзакции в Postgres
-"""
+"""Генерирует пользователей и транзакции для локального стенда."""
 
 import os
 import time
@@ -20,7 +17,6 @@ log = logging.getLogger(__name__)
 
 fake = Faker()
 
-# ── настройки из переменных окружения ──────────────────────────────────────
 DB_CONFIG = {
     "host": os.getenv("DB_HOST", "localhost"),
     "port": int(os.getenv("DB_PORT", "5432")),
@@ -30,7 +26,6 @@ DB_CONFIG = {
 }
 TPS = float(os.getenv("TRANSACTIONS_PER_SECOND", "2"))
 
-# ── справочники ────────────────────────────────────────────────────────────
 CATEGORIES = [
     "groceries", "entertainment", "travel", "dining",
     "healthcare", "electronics", "clothing", "utilities",
@@ -48,7 +43,7 @@ MERCHANTS = {
 CURRENCIES = ["USD", "EUR", "RUB", "GBP"]
 COUNTRIES = ["Russia", "Germany", "USA", "France", "UK", "Netherlands"]
 STATUSES = ["completed", "completed", "completed", "completed", "failed", "pending"]
-FRAUD_RATE = 0.03   # 3% транзакций — фрод
+FRAUD_RATE = 0.03
 
 
 def connect(retries: int = 10, delay: int = 3) -> psycopg2.extensions.connection:
@@ -99,7 +94,6 @@ def make_transaction(user_ids: list[str]) -> tuple:
     merchant = random.choice(MERCHANTS[category])
     is_fraud = random.random() < FRAUD_RATE
 
-    # Мошеннические транзакции — нетипично большие суммы
     if is_fraud:
         amount = round(random.uniform(500, 5000), 2)
     else:
@@ -118,7 +112,7 @@ def make_transaction(user_ids: list[str]) -> tuple:
 
 def run(conn, user_ids: list[str]) -> None:
     interval = 1.0 / TPS
-    batch_size = max(1, int(TPS))   # пишем батчами раз в секунду
+    batch_size = max(1, int(TPS))
     batch: list[tuple] = []
     total = 0
 
